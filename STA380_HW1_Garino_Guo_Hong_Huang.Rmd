@@ -1,0 +1,463 @@
+---
+title: "STAT380_Exer1"
+author: "Anthony Garino, Anqi Huang, Olivia Hong, Yun Guo"
+date: "Summer 2016"
+output: pdf_document
+---
+
+### Probability practice
+
+```{r, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+TC <- .7
+RC <- .3
+Y <- .65
+YRC <- .5
+
+f <- function(X,Y)(.7*X)+(.3)*(.5)-Y
+uniroot(f, Y=0.65, lower=0.1, upper=100000000)$root
+
+W <- .993
+PNND <- .9999
+PD <- .000025
+PND <- .0001
+
+g <- function(W,Z)(.000025*Z) + (.0001)*(.9999)-W
+uniroot(g, Z=.993, lower=0, upper=100000000)$root
+Z <-0.000124815
+
+PD*W/Z
+```
+
+Variables:
+
+RC = Random clicker;
+TC = truthful clicker;
+Y = answered yes
+
+
+Probabilities:
+
+P(RC) = 0.30
+
+P(TC) = 0.70
+
+P(Y) = 0.65
+
+P(Y|RC) = 0.50
+
+Used a function and set P(Y|TC) = X and used a function to solve for X. The equation was the Law of Total Probability
+P(Y) = P(Y|TC)P(TC) + P(Y|RC)P(RC)
+
+0.65 = P(Y|TC)(0.70) + (0.50)(0.30)
+
+$P(Y|TC) = 0.714$
+
+Fraction of truthful clickers who answered 'yes' - 0.714 = 5/7
+
+**Part B.**
+
+Variables:
+
+W = test positive
+
+PNND = test negative
+
+PD = has disease
+
+PND = does not have disease
+
+
+Probabilities:
+
+P(P|D) = 0.993
+
+P(N|ND) = 0.9999
+
+P(D) = 0.000025
+
+P(P|ND) = 1-P(N|ND) = .0001
+
+Using Bayes Rules
+
+P(P) = P(P|D)P(D) + P(P|ND)P(ND)
+
+P(P) = (0.993)(0.000025) + (.0001)(0.999975)
+
+P(P) = 0.00002482 + 0.0001 = 0.00012482
+P(P) = Z
+Z = 0.000124815
+
+$P(D|P) = \frac{P(D)*P(P|D)}{P(P)}$
+
+$P(D|P) = \frac{0.000025*0.993}{.00012482}$
+
+$P(D|P) = 0.1988944$
+
+The probability that someone has the disease given that he/she tested positive is almost 20%. This is a problem because testing positive and not having the disease is much more likely than actually having the disease.
+
+
+
+
+
+# Exploratory analysis: green buildings
+
+First, in the conclusion of the developer's on staff stats guru, he found that there are $2.6 differences for the medium in the market per square food per year between green and non-green buildings. Without any supportive evidence, he attributes all the difference to being "green", so he concludes that the rent will be $2.6 higher per square foot if it is a green building. And all the rest of the pay-off calculations are based on this spurious assupmtion. 
+
+So there may be some other factors that have big influence and they all together cause a higher market rent, and being a "green building" can be just part of the reason for the rent difference.
+
+To find out whether certain factors are more important in deciding the rent per square foot per year, we first try random forest model. Because the Property ID, on common sense, is assigned by estate officers and it shouldn't have any influence on rent, we didn't include it in our predictors. 
+
+```{r, echo=FALSE}
+library(randomForest)
+# read-in data and delete the ID column
+green1 <- read.csv("greenbuildings.csv", header=TRUE)
+green2 <- na.omit(green1)
+green <- subset(green2, select = -c(CS_PropertyID) )
+mtry_value = 6 # Number of randomly sampled variables to be selected for each tree
+ntree_value = 500 # Number of trees
+# train the random forst with given parameters (got from params_rf)
+rf_rent = randomForest(Rent~., data=green, mtry=mtry_value, ntree=ntree_value, importance=TRUE)
+print('Variable Importance\n')
+print(importance(rf_rent))
+```
+
+
+
+```{r, echo=FALSE}
+varImpPlot(rf_rent)
+```
+
+Looking at the results and plot of feature importance, we will find that the "age", "size" and "leasing_rate" is actually the factors that have the biggest decision power of the rent per square feet. And "green_rating", "LEED" and "Energystar" are least important features. Here, we can conclude that whether the building is "green" or not isn't the reason or the main reason which caused $2.6 higher in rent per square foot per year.
+
+And the results shown above can still explain the phenomenon that "green buildings" often have higher rent. Because, in practical, usually green buildings, as a pretty new and contemporary concept that just put into use recent years, are younger than others thus have smaller age and bigger size, the newer and bigger sized buildings are supposed to lead to a  higher rent. So we need to note that, it is the age, size and leasing rate that contribute most to a higher rent for a green building, not being "green". 
+
+Then in order to see if there any confounding variables for the relationship between rent and green status, we ran the random forest model again and set the "green_rating" as the target. 
+
+Because we know that "Energystar" and "LEED" are the factors that evaluate the green rating, besides removing "Property ID", we also removed those two features to avoid noise. 
+
+
+
+```{r, echo=FALSE}
+green1 <- read.csv("greenbuildings.csv", header=TRUE)
+green2 <- na.omit(green1)
+green <- subset(green2, select = -c(CS_PropertyID, Rent,LEED,Energystar) )
+mtry_value = 6 # Number of randomly sampled variables to be selected for each tree
+ntree_value = 500 # Number of trees
+rf = randomForest(green_rating~., data=green, mtry=mtry_value, ntree=ntree_value, importance=TRUE)
+print('Variable Importance\n')
+print(importance(rf))
+```
+
+```{r, echo=FALSE}
+varImpPlot(rf)
+```
+
+We can find that, from the results and plot, gas costs and electricity costs are the two most important factors that contribute to a building's green rating. That is to say, the gas and electricity costs can greatly influence whether the building should obtain a green certificate.
+
+Now we look back to the previous plot which shows the feature importance for "rent". Gas costs and electricity costs are also two factors that have much more importance than "green status" when deciding the rent per square foot. Thus, we can have a reasonable guess that a higher rent and being "green" are both the consequence of higher gas and electricity costs, that is to say, higher rent isn't come from a high green rate. 
+
+
+In conclusion, the recommendation in the question is unacceptable. Even if the new building that they are working on isn't going to be green, the rent will be somehow higher than the median market rent square per feet because it's new and most likely it will have bigger size than the older buildings. And to be honest, the extra 5% premium for green certification may not lead to sizeable difference in rent or only a very small difference.
+
+In order to figure out how the green status will have impact on the rent, a multi-regression model may help. Because from random forest, green_rating is already the least important factors for rent, we include almost all variables in the regression model and only remove the Property ID column. 
+
+```{r, echo=FALSE}
+green_origin <- read.csv("greenbuildings.csv", header=TRUE)
+green_new <- na.omit(green_origin)
+green <- subset(green_new, select = -c(CS_PropertyID) )
+regression = lm(Rent~., data = green)
+summary(regression)
+```
+
+So from the result of the multi-regression, it is easy to find that the coefficient for green_rating is only ~$0.7, not $2.6 mentioned in the question. That is to say, holding everything else constant, with the green certificate, the rent will only be $0.7 higher than a non-green building. 
+
+If the building has 250,000 square foot, then they will generate 250,000 * 0.7 = $175,000 of extra revenue per year if they build the green building. And because there are around 5% premium for a green certificate, which is 5% * 100 million = $5,000,000, they will need 5,000,000 / 175,000 = 28.57 years to recuperate these costs. However, we still need to note that, from the multi-regression, the green_rating is rejected at all statistically significant level, which means people would better not conclude any impact of green status on rent.
+
+
+
+```{r, echo=FALSE}
+morethan90_green <- green [which(green$green_rating == '1' & green$leasing_rate > 90), ]
+nrow(morethan90_green)
+
+```
+
+And looking at the leasing rate of all the green building, 415 out of 685 (60.59%) have more than 90% leasing rate. So we believe they are reasonable to assume that the leasing rate for the new building can exceed 90%. So when the leasing rate is around 90%, they probably need more than 30 years to cover the premium on green certificate. 
+
+Instead of only considering green building can lead to a higher rent, we will recommend the developer to look at the gas and electricity costs of the building location and see if there is any need to get a green certificate. From the previous analysis, these costs are actually the main points when decide whether to be "green".
+
+
+```{r, echo=FALSE}
+morethan90_nongreen <- green [which(green$green_rating == '0' & green$leasing_rate > 90), ]
+nrow(morethan90_nongreen)
+```
+
+Then let's take a look of the INDIRECT impact of green status on rent.
+
+
+For non-green buildings, 3424 out of 7209 (47.5%) has leasing rate more than 90%, which is lower than the 60.59% for green buildings. So as the question has described, there are some benefit of the leasing rate if the building has a green certificate. From the previous analysis, leasing rate is a very important factor that can contribute to rent.
+
+```{r, echo=FALSE}
+morethan2_green <- green [which(green$green_rating == '1' & green$empl_gr > 2), ]
+nrow(morethan2_green)
+```
+433 / 685 = 63.2%
+
+
+```{r, echo=FALSE}
+morethan2_nongreen <- green [which(green$green_rating == '0' & green$empl_gr > 2), ]
+nrow(morethan2_nongreen)
+```
+3350 / 7209 = 46.5%
+
+So the same thing happens to "empl.gr": the year-on-year growth rate in employment in the building's geographic region. The building with green certificate is more likely to have a higher year to year growth rate in employment, which should be desired by most of the companies and thus increase the rent accordingly. 
+
+
+Combining both the direct and indirect impact "green rating" on the rent, the actual time to cover the 5% of premium for green certificate should be shorter than 30 years as if we only consider the direct influence on green but still much longer than 8 years as the recommendation in question.
+
+
+\newpage
+
+
+# Bootstrapping
+
+```{r, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Given five asset classes, we can create portfolios to explore different combinations of assets based on their return and risk. We will look at the returns for the time period between January 2011 and August 2016, so a span of more than 5 years. The five classes are:
+
+* US domestic equities (SPY: the S&P 500 stock index)
+* US Treasury bonds (TLT)
+* Investment-grade corporate bonds (LQD)
+* Emerging-market equities (EEM)
+* Real estate (VNQ)
+
+The S&P 500 will represent the market.
+
+**Exploring the data**
+
+```{r, include=FALSE, echo=FALSE}
+library(fImport)
+library(foreach)
+library(mosaic)
+```
+
+```{r, echo=FALSE}
+YahooPricesToReturns = function(series) {
+  mycols = grep('Adj.Close', colnames(series))
+  closingprice = series[,mycols]
+  N = nrow(closingprice)
+  percentreturn = as.data.frame(closingprice[2:N,]) / as.data.frame(closingprice[1:(N-1),]) - 1
+  mynames = strsplit(colnames(percentreturn), '.', fixed=TRUE)
+  mynames = lapply(mynames, function(x) return(paste0(x[1], ".PctReturn")))
+  colnames(percentreturn) = mynames
+  as.matrix(na.omit(percentreturn))
+}
+
+mystocks = c("SPY", "TLT", "LQD", "EEM", "VNQ", "^GSPC")
+myprices = yahooSeries(mystocks, from='2011-01-01', to='2016-08-01')
+myreturns = YahooPricesToReturns(myprices)
+
+pairs(myreturns)
+```
+
+
+
+```{r, echo=FALSE,fig.width = 10, fig.height = 11}
+par(mfrow=c(3,2))
+plot(myreturns[,1], type='l', ylim=c(-0.06,.06), main="SPY")
+plot(myreturns[,2], type='l', ylim=c(-0.06,.06), main="TLT")
+plot(myreturns[,3], type='l', ylim=c(-0.06,.06), main="LQD")
+plot(myreturns[,4], type='l', ylim=c(-0.06,.06), main="EEM")
+plot(myreturns[,5], type='l', ylim=c(-0.06,.06), main="VNQ")
+plot(myreturns[,6], type='l', ylim=c(-0.06,.06), main="Market")
+```
+
+From the pairwise plot, there are some positive correlations, such as those between TLT and LQD, SPY and EEM, SPY and VNQ. So the porfolio will have more ups and downs as a result. We can also look at the returns over time. The graphs of returns show that they all roughly center around 0, with EEM having a much larger range of ups and downs than ETFs like LQD. 
+
+Next, we calculate the beta from the CAPM model to measure the volatility of an asset compared to the whole market. From this we see that all classes except for EEM have a beta less than 1. This means that they are less volatile than the market. Taking the standard deviation of the returns also indicates something similar; EEM has the highest SD while LQD has the lowest.
+
+```{r, echo=FALSE}
+lm.S = lm(myreturns[,1] ~ myreturns[,6])
+lm.T = lm(myreturns[,2] ~ myreturns[,6])
+lm.L = lm(myreturns[,3] ~ myreturns[,6])
+lm.E = lm(myreturns[,4] ~ myreturns[,6])
+lm.V = lm(myreturns[,5] ~ myreturns[,6])
+cat("SYP, ", coef(lm.S));
+cat("TLT, ", coef(lm.T));
+cat("LQD, ", coef(lm.L));
+cat("EEM, ", coef(lm.E));
+cat("VNQ, ", coef(lm.V))
+
+sigma.S = sd(myreturns[,1])
+sigma.T = sd(myreturns[,2])
+sigma.L = sd(myreturns[,3])
+sigma.E = sd(myreturns[,4])
+sigma.V = sd(myreturns[,5])
+sigmas = cbind(sigma.S, sigma.T, sigma.L, sigma.E, sigma.V)
+barplot(sigmas, main="Standard Deviation", cex.names=.7)
+```
+
+For a safe portfolio, we can choose mostly index-tracking funds, U.S. treasury bonds (that may protect a portfolio against a stock market crash/recession but may have lower yields), and low-volatility ETFs. One option is SPY, TLT, and LQD (chosen for its low volatility). We can use a higher weighting on SPY and TLT (e.g. 40% each), with 20% for LQD.
+
+For an aggressive portfolio, we can choose EEM which has a beta greater than 1, and SPY, with 50% each.
+
+**Bootstrap resampling**
+
+We use the bootstrap to estimate the 4-week value at risk for each portfolio at the 5% level, using 5000 Monte Carlo simulations.
+
+```{r, echo=FALSE}
+# bootstrap for even split
+mystocks = c("SPY", "TLT", "LQD", "EEM", "VNQ")
+myprices = yahooSeries(mystocks, from='2011-01-01', to='2016-08-01')
+myreturns = YahooPricesToReturns(myprices)
+
+set.seed(1)
+sim1 = foreach(i=1:5000, .combine='rbind') %do% {
+  totalwealth = 100000
+  weights = c(0.2, 0.2, 0.2, 0.2, 0.2)
+  holdings = weights * totalwealth
+  n_days = 20
+  wealthtracker = rep(0, n_days)
+  for(today in 1:n_days) {
+    return.today = resample(myreturns, 1, orig.ids=FALSE)
+    holdings = holdings + holdings*return.today
+    totalwealth = sum(holdings)
+    wealthtracker[today] = totalwealth
+  }
+  wealthtracker
+}
+#quantile(sim1[,n_days], 0.05) - 100000
+
+# bootstrap for safe portfolio
+mystocks = c("SPY", "TLT", "LQD")
+myprices = yahooSeries(mystocks, from='2011-01-01', to='2016-08-01')
+myreturns = YahooPricesToReturns(myprices)
+
+set.seed(1)
+sim2 = foreach(i=1:5000, .combine='rbind') %do% {
+  totalwealth = 100000
+  weights = c(0.4, 0.4, 0.2)
+  holdings = weights * totalwealth
+  n_days = 20
+  wealthtracker = rep(0, n_days)
+  for(today in 1:n_days) {
+    return.today = resample(myreturns, 1, orig.ids=FALSE)
+    holdings = holdings + holdings*return.today
+    totalwealth = sum(holdings)
+    wealthtracker[today] = totalwealth
+  }
+  wealthtracker
+}
+#quantile(sim2[,n_days], 0.05) - 100000
+
+# bootstrap for aggressive portfolio
+mystocks = c("SPY", "EEM")
+myprices = yahooSeries(mystocks, from='2011-01-01', to='2016-08-01')
+myreturns = YahooPricesToReturns(myprices)
+
+set.seed(1)
+sim3 = foreach(i=1:5000, .combine='rbind') %do% {
+  totalwealth = 100000
+  weights = c(0.5, 0.5)
+  holdings = weights * totalwealth
+  n_days = 20
+  wealthtracker = rep(0, n_days)
+  for(today in 1:n_days) {
+    return.today = resample(myreturns, 1, orig.ids=FALSE)
+    holdings = holdings + holdings*return.today
+    totalwealth = sum(holdings)
+    wealthtracker[today] = totalwealth
+  }
+  wealthtracker
+}
+#quantile(sim3[,n_days], 0.05) - 100000
+```
+
+The value at risk for each is as follows:
+
+* Even split: -3697.652 
+* Safe: -2248.11 
+* Aggressive: -7814.795
+
+So the aggressive portfolio could have the largest loss from the initial investment.
+
+We can also look at the histogram for the profit and loss distribution in 4 weeks. From this, the aggressive portfolio has the largest spread. It could result in a large yield, but generally it would be better to use a less volatile method. The even and split portfolios both have slightly more weight on the profit end with similar levels of uncertainty. The conservative investor may want to choose one of these two methods.
+
+```{r, echo=FALSE,fig.width = 10, fig.height = 10}
+par(mfrow=c(3,1))
+hist(sim1[,n_days] - 100000, main="Even")
+hist(sim2[,n_days] - 100000, main="Safe")
+hist(sim3[,n_days] - 100000, main="Aggressive")
+```
+
+
+
+
+# Market Segmentation
+
+```{r, include=TRUE, echo=FALSE, fig.width = 10, fig.height = 7}
+# Read in dataset
+d<-read.csv('social_marketing.csv',header = T,sep = ',')
+# Scale and center dataset except factor columns
+d_scale<-scale(d[,-c(1:2)],center = T,scale = T)
+# Do a K-means clustering model for scaled dataset
+km <- kmeans(x=d_scale,centers = 3, nstart = 25)
+# Get the center for each of the 3 clusters
+c1 <- km$center[1,]
+c2 <- km$center[2,]
+c3 <- km$center[3,]
+# Get the pre-scaling mean and standard deviation for EVERY column
+mean <- attr(d_scale, which = 'scaled:center')
+std <- attr(d_scale, which = 'scaled:scale')
+# Plot the 3 clusters in one go
+par(mar=c(6.5,1,1,1))
+plot(c1*std+mean, col='red', pch=15, yaxt='n', xaxt='n', ylab='', xlab='', type = 'b')
+par(new=T)
+plot(c2*std+mean, col='blue', pch=17, yaxt='n', xaxt='n', ylab='', xlab='', type = 'b')
+par(new=T)
+plot(c3*std+mean, col='green', pch=19, yaxt='n', xaxt='n', ylab='', xlab='', type = 'b')
+axis(side = 1, at = c(1:35), labels = colnames(d_scale),las=2, cex.axis = 0.8)
+legend('topright', legend = c('Cluster 1', 'Cluster 2', 'Cluster 3'), col=c('red','blue','green'), pch = c(15,17,19))
+```
+
+Obviously, there are a few 'crest' topics within each cluster. Cluster 2 contains keywords such as "sports_fandom", "food", "religion"... This is reminiscent of a male clientele.
+
+However, the remaining two groups (Clusters 1 and 3) show a high level of consistency in terms of term frequency. They are concerned about homogeneous subjects such as "photo_sharing", "health_nutrition", "cooking" - a reasonable assumption can be made here that they actually form a single distinctive consumer base - females.
+
+### Next we try to see if Clusters 1 and 3 can be collapsed into one.
+
+```{r, include=TRUE, echo=FALSE, fig.width = 10, fig.height = 8}
+# Plot cluster1,3
+plot(c1*std+mean, col='red', pch=17, yaxt='n', xaxt='n', type = 'b', ylab='', xlab='', main = paste('Spearman coefficient =', round(cor(c1*std+mean,c3*std+mean,method='spearman'),digits = 2)))
+par(new=T)
+plot(c3*std+mean, col='green', pch=19, yaxt='n', xaxt='n', type = 'b', ylab='', xlab='')
+axis(side = 1, at = c(1:35), labels = colnames(d_scale),las=2, cex.axis = 0.8)
+legend('topright', col=c('red','green'), pch=c(17,19),legend = c('Cluster 1','Cluster 3'))
+```
+
+The Spearman correlation between Cluster 1 and 3 term frequency is ~0.86, indicating a high inter-relatedness. And since most of the keywords are home/beauty-related, we can perhaps treat them as one cluster.
+
+### Next we try to see if Clusters 1 and 3 can be collapsed into one.
+
+```{r, include=TRUE, echo=FALSE}
+# Subset out cluster 1 and 3 in qplot of their keywords
+library(ggplot2)
+not_first<-d[km$cluster!=2,]
+not_first_obj<-km$cluster[km$cluster!=2]
+qplot(cooking,photo_sharing,data = not_first,col=factor(not_first_obj))
+```
+
+
+
+Finally, when we plot the top topic for both cluster 1 and 3, we can see that cluster 3 is high on the cooking dimension, while cluster 1 tends to concentrate on the photo_sharing (beauty) aspect (quite low on cooking). This likely points to the possibility that cluster 1 represents younger portion of the female customer body.
+
+In conclusion, we have discovered 1 main market segmentation and and 2 niches:
+Cluster 1 consists primarily of younger-aged females (5041 people);
+Cluster 2 consists primarily of males (822 people);
+Cluster 3 consists primarily of middle-aged females (2019 people).
+
+It would serve NutrientH20 well to tap into the consumer cluster corresponding to its targeted market segment strategy.
+
